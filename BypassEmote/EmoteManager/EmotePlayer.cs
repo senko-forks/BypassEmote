@@ -118,27 +118,7 @@ internal static unsafe class EmotePlayer
                 }
         }
 
-        var local = NoireService.ObjectTable.LocalPlayer;
-        if (local != null && local.Address == chara.Address)
-        {
-            // Fire IPC event after delay only if local player is the one playing the emote
-            // The delay tries to ensure that your character has stopped moving on other clients (other players' screens) before notifying IPC subscribers
-            // This is due to the slight desync/delay there is between 2 players when performing any action because this is how the game servers work
-            // Without this delay, other players might see your character perform the bypassed emote, but then you will still be moving thus stopping the bypassed emote
-            // This is also mitigated by the OnFrameworkUpdate check for position/rotation changes, but this delay helps a lot with consistency
-            var provider = Service.Ipc;
-            var ipcData = new IpcData(emote.RowId);
-
-            provider?.OnStateChangeImmediate?.Invoke(ipcData.Serialize());
-            provider?.OnEmoteStateStartImmediate?.Invoke(ipcData.IsLoopedEmote(), ipcData.Serialize());
-
-            DelayerHelper.CancelAll();
-            DelayerHelper.Start("PlayBypassedEmote", () =>
-            {
-                provider?.OnStateChange?.Invoke(ipcData.Serialize());
-                provider?.OnEmoteStateStart?.Invoke(ipcData.IsLoopedEmote(), ipcData.Serialize());
-            }, 500);
-        }
+        IpcHelper.HandlePlayEmote(chara, emote);
     }
 
     public static bool IsCharacterInBypassedLoop(ICharacter chara)
@@ -253,38 +233,9 @@ internal static unsafe class EmotePlayer
 
     public static void Stop(ActionTimelinePlayer player, ICharacter character, bool ShouldNotifyIpc, bool force = false)
     {
-        var local = NoireService.ObjectTable.LocalPlayer;
-        if (ShouldNotifyIpc && character is IPlayerCharacter playerCharacter && local != null && local.Address == character.Address)
-        {
-            // Fire IPC event only if local player is stopping a looped emote
-            var trackedCharacter = CommonHelper.TryGetTrackedCharacterFromAddress(character.Address);
-
-            if (trackedCharacter != null)
-            {
-                // Tell IPC Callers that the emote has stopped immediately and again after the delay
-                // Kinda hacky-whacky way to ensure the emote stop is registered properly with sync but it works.
-                // This is needed to avoid the server position desync issue.
-                // When player A moves and bypasses an emote, this player might still be moving on player B's screen when player A starts the emote, causing a false-positive "stop emote" message
-                uint playingEmoteId = trackedCharacter.PlayingEmoteId ?? 0;
-                var provider = Service.Ipc;
-                var ipcDataStop = new IpcData(0).Serialize();
-
-                provider?.OnStateChangeImmediate?.Invoke(ipcDataStop);
-                provider?.OnEmoteStateStopImmediate?.Invoke();
-
-                provider?.OnStateChange?.Invoke(ipcDataStop);
-                provider?.OnEmoteStateStop?.Invoke();
-
-                DelayerHelper.CancelAll();
-                DelayerHelper.Start("StopBypassingEmote", () =>
-                {
-                    provider?.OnStateChange?.Invoke(ipcDataStop);
-                    provider?.OnEmoteStateStop?.Invoke();
-                }, 500);
-            }
-        }
-
         player.Stop(character, force);
+        if (ShouldNotifyIpc)
+            IpcHelper.HandleStopEmote(character);
     }
 
     public static void StopLoop(ICharacter? chara, bool shouldRemoveFromList)
@@ -331,9 +282,6 @@ internal static unsafe class EmotePlayer
                 return;
             }
 
-            var isLocalPlayer = NoireService.ObjectTable.LocalPlayer != null && character.Address == NoireService.ObjectTable.LocalPlayer.Address;
-
-            var charaName = character.Name.TextValue;
             var trackedChara = CommonHelper.TryGetCharacterFromTrackedCharacter(trackedCharacter);
 
             if (trackedChara == null || !CharacterHelper.IsCharacterInObjectTable(trackedChara))
@@ -342,10 +290,12 @@ internal static unsafe class EmotePlayer
                 return;
             }
 
+            var isLocalObject = IpcHelper.IsLocalObject(character);
+
             var pos = character.Position;
             var deltaPosDistance = MathHelper.Distance(pos, trackedCharacter.LastPlayerPosition);
-            if ((isLocalPlayer && pos != trackedCharacter.LastPlayerPosition) ||
-                (!isLocalPlayer && deltaPosDistance > 0.5))
+            if ((isLocalObject && pos != trackedCharacter.LastPlayerPosition) ||
+                (!isLocalObject && deltaPosDistance > 0.5))
             // 0.5 of margin of error for other players, in case the "stop emote" message is not correctly sent/received, this acts as a "failsafe" for that scenario
             {
                 StopLoop(character, true);
@@ -356,8 +306,8 @@ internal static unsafe class EmotePlayer
             var normalizedCurrentRotation = MathHelper.NormalizeAngle(MathHelper.ToDegrees(rot));
             var normalizedLastObservedRotation = MathHelper.NormalizeAngle(MathHelper.ToDegrees(trackedCharacter.LastPlayerRotation));
             var difference = MathHelper.Abs(MathHelper.DeltaAngle(normalizedCurrentRotation, normalizedLastObservedRotation));
-            if ((isLocalPlayer && rot != trackedCharacter.LastPlayerRotation) ||
-                (!isLocalPlayer && difference > 20))
+            if ((isLocalObject && rot != trackedCharacter.LastPlayerRotation) ||
+                (!isLocalObject && difference > 20))
             // Same reason as for the position, 20 degrees of margin of error for other players
             {
                 if (trackedCharacter.PlayingEmoteId.HasValue)

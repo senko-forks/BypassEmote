@@ -50,32 +50,32 @@ public class DebugWindow : Window, IDisposable
         NoireLogger.LogDebug(this, $"BypassEmote IPC is Ready");
     }
 
-    private void LogStateChanged(string newState)
+    private void LogStateChanged(nint character, string newState)
     {
         NoireLogger.LogDebug(this, $"BypassEmote IPC sent state changed message. Data: {newState}");
     }
 
-    private void LogEmoteStateStart(bool isLooping, string ipcData)
+    private void LogEmoteStateStart(nint character, bool isLooping, string ipcData)
     {
         NoireLogger.LogDebug(this, $"BypassEmote IPC sent start message. IsLooping: {isLooping}, Data: {ipcData}");
     }
 
-    private void LogEmoteStateStop()
+    private void LogEmoteStateStop(nint character)
     {
         NoireLogger.LogDebug(this, $"BypassEmote IPC sent stop message");
     }
 
-    private void LogStateChangedImmediate(string obj)
+    private void LogStateChangedImmediate(nint character, string obj)
     {
         NoireLogger.LogDebug(this, $"BypassEmote IPC sent IMMEDIATE state changed message. Data: {obj}");
     }
 
-    private void LogEmoteStateStartImmediate(bool isLooping, string ipcData)
+    private void LogEmoteStateStartImmediate(nint character, bool isLooping, string ipcData)
     {
         NoireLogger.LogDebug(this, $"BypassEmote IPC sent IMMEDIATE start message. IsLooping: {isLooping}, Data: {ipcData}");
     }
 
-    private void LogEmoteStateStopImmediate()
+    private void LogEmoteStateStopImmediate(nint character)
     {
         NoireLogger.LogDebug(this, $"BypassEmote IPC sent IMMEDIATE stop message");
     }
@@ -276,7 +276,7 @@ public class DebugWindow : Window, IDisposable
         {
             if (child)
             {
-                var ipcData = Service.Ipc.GetStateForLocalPlayer();
+                var ipcData = Service.Ipc.GetStateForCharacter(NoireService.ObjectTable.LocalPlayer!.Address);
 
                 if (!string.IsNullOrEmpty(ipcData))
                 {

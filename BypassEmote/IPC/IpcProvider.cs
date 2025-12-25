@@ -9,7 +9,7 @@ namespace BypassEmote;
 
 public class IpcProvider
 {
-    public static int MajorVersion => 2;
+    public static int MajorVersion => 3;
     public static int MinorVersion => 0;
 
     private bool _isReady { get; set; } = false;
@@ -68,7 +68,7 @@ public class IpcProvider
     /// <param name="characterAddress">The address of the character to apply the data to.</param>
     /// <param name="data">The serialized IpcData to apply to the character.</param>
     [EzIPC("SetStateForCharacter")]
-    public void SetStateForCharacter(IntPtr characterAddress, string data)
+    public void SetStateForCharacter(nint characterAddress, string data)
     {
         if (_disposed)
             throw new ObjectDisposedException("IpcProvider");
@@ -88,7 +88,7 @@ public class IpcProvider
     /// </summary>
     /// <param name="characterAddress">The address of the character you want to clear the state for.</param>
     [EzIPC("ClearStateForCharacter")]
-    public void ClearStateForCharacter(IntPtr characterAddress)
+    public void ClearStateForCharacter(nint characterAddress)
     {
         if (_disposed)
             throw new ObjectDisposedException("IpcProvider");
@@ -102,34 +102,12 @@ public class IpcProvider
     }
 
     /// <summary>
-    /// Gets the current state data of the local player.<br/>
-    /// Needs to be run on the framework thread for now. Subject to change later.
-    /// </summary>
-    /// <returns>A serialized IpcData representing the local player's current state.</returns>
-    [EzIPC("GetStateForLocalPlayer")]
-    public string GetStateForLocalPlayer()
-    {
-        if (_disposed)
-            throw new ObjectDisposedException("IpcProvider");
-
-        IpcData data = new IpcData(0);
-
-        var localPlayer = NoireService.ObjectTable.LocalPlayer;
-        if (localPlayer == null) return data.Serialize();
-
-        var trackedCharacter = CommonHelper.TryGetTrackedCharacterFromAddress(localPlayer.Address);
-        data.EmoteId = trackedCharacter?.PlayingEmoteId ?? 0;
-
-        return data.Serialize();
-    }
-
-    /// <summary>
     /// Gets the current state data of the specified character.<br/>
     /// Needs to be run on the framework thread for now. Subject to change later.
     /// </summary>
     /// <returns>A serialized IpcData representing the specified character's current state.</returns>
     [EzIPC("GetStateForCharacter")]
-    public string GetStateForCharacter(IntPtr characterAddress)
+    public string GetStateForCharacter(nint characterAddress)
     {
         if (_disposed)
             throw new ObjectDisposedException("IpcProvider");
@@ -172,7 +150,7 @@ public class IpcProvider
     /// If you only want to know when the local player *stops* bypassing an emote, use <see cref="OnEmoteStateStop"/>.<br/>
     /// </remarks>
     [EzIPCEvent("OnStateChange")]
-    public Action<string>? OnStateChange;
+    public Action<nint, string>? OnStateChange;
 
     /// <summary>
     /// Same as <see cref="OnStateChange"/>, except it fires only once and immediately when the state changes, instead of:<br/>
@@ -183,7 +161,7 @@ public class IpcProvider
     /// If your intention is to sync multiple clients together, this is *NOT* recommended and you should use <see cref="OnStateChange"/> instead.
     /// </remarks>
     [EzIPCEvent("OnStateChangeImmediate")]
-    public Action<string>? OnStateChangeImmediate;
+    public Action<nint, string>? OnStateChangeImmediate;
 
     /// <summary>
     /// An event that fires when the local player starts bypassing an emote.<br/>
@@ -199,7 +177,7 @@ public class IpcProvider
     /// Will *not* trigger when stopping any emote.
     /// </remarks>
     [EzIPCEvent("OnEmoteStateStart")]
-    public Action<bool, string>? OnEmoteStateStart;
+    public Action<nint, bool, string>? OnEmoteStateStart;
 
     /// <summary>
     /// Same as <see cref="OnEmoteStateStart"/>, but fires immediately when the emote starts playing instead of 500ms later.<br/>
@@ -208,7 +186,7 @@ public class IpcProvider
     /// If your intention is to sync multiple clients together, this is *NOT* recommended and you should use <see cref="OnEmoteStateStart"/> instead.<br/><br/>
     /// </remarks>
     [EzIPCEvent("OnEmoteStateStartImmediate")]
-    public Action<bool, string>? OnEmoteStateStartImmediate;
+    public Action<nint, bool, string>? OnEmoteStateStartImmediate;
 
     /// <summary>
     /// An event that fires when the state of a character is cleared (i.e.: when stopping a looping emote).<br/>
@@ -221,7 +199,7 @@ public class IpcProvider
     /// Will *not* trigger when starting to bypass an emote.<br/>
     /// </remarks>
     [EzIPCEvent("OnEmoteStateStop")]
-    public Action? OnEmoteStateStop;
+    public Action<nint>? OnEmoteStateStop;
 
     /// <summary>
     /// Same as <see cref="OnEmoteStateStop"/>, but fires only once and immediately when the emote is stopped instead of twice (once immediately, once after 500ms delay).<br/>
@@ -230,7 +208,7 @@ public class IpcProvider
     /// If your intention is to sync multiple clients together, this is *NOT* recommended and you should use <see cref="OnEmoteStateStop"/> instead.
     /// </remarks>
     [EzIPCEvent("OnEmoteStateStopImmediate")]
-    public Action? OnEmoteStateStopImmediate;
+    public Action<nint>? OnEmoteStateStopImmediate;
 
     /// <summary>
     /// An event that fires when BypassEmote is disposing.

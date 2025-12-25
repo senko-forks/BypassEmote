@@ -1,8 +1,10 @@
+using BypassEmote.Helpers;
 using BypassEmote.UI;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Command;
 using Dalamud.Game.Network;
 using Dalamud.Game.Text.SeStringHandling;
@@ -262,10 +264,23 @@ public sealed class Plugin : IDalamudPlugin
 
         if (command == "/bet")
         {
-            if (NoireService.TargetManager.Target is not INpc npcTarget || NoireService.TargetManager.Target.ObjectKind == ObjectKind.Companion)
+            ICharacter npcTarget;
+
+            if (NoireService.TargetManager.Target is not INpc && NoireService.TargetManager.Target is not IBattleNpc)
             {
                 NoireLogger.PrintToChat("No NPC targeted.");
                 return;
+            }
+
+            npcTarget = (ICharacter)NoireService.TargetManager.Target;
+
+            if (NoireService.TargetManager.Target.OwnerId != 0)
+            {
+                if (!IpcHelper.IsLocalObject(npcTarget))
+                {
+                    NoireLogger.PrintToChat("You can only target your own companion.");
+                    return;
+                }
             }
 
             if (splitArgs.Length > 0)
